@@ -4,7 +4,7 @@ import math
 import numpy
 import matplotlib.pyplot as plt
 from sklearn.ensemble import RandomForestClassifier, GradientBoostingClassifier, AdaBoostClassifier, VotingClassifier, ExtraTreesClassifier
-
+from sklearn import tree, cross_validation
 # Holds the words corresponding to each coordinate in the bag of words
 # representation.
 names = []
@@ -82,6 +82,7 @@ if __name__ == '__main__':
 	   since it just prints the prediction to standard output otherwise.'''
 	(training, labels) = parseTraining('training_data.txt', '|')
 	test = parseTest('testing_data.txt', '|')
+	xTrain, xValidate, yTrain, yValidate = cross_validation.train_test_split(training, labels, test_size=0.1)
 	# Boosted Decision Trees
 	# We train a number of trees of max depth 3 (the default argument). Use
 	# 'exponential' to tell the class to use the AdaBoost algoritum.
@@ -101,8 +102,24 @@ if __name__ == '__main__':
 	bag = RandomForestClassifier(n_estimators = nbagged)
 	bag = bag.fit(training, labels)
 
+	# Trains some decision tree classifiers
+	train_err = []
+	val_err = []
+	trees = []
+	for i in range(1,200):
+	# Specify tree params
+		dTree = tree.DecisionTreeClassifier(criterion = 'gini', min_samples_leaf = i)
+		# Train Tree
+		dTree = dTree.fit(xTrain, yTrain)
+		# Calculate Error
+		train_err.append(1 - dTree.score(xTrain, yTrain))
+		val_err.append(1 - dTree.score(xValidate, yValidate))
+		trees.append(dTree)
+
+	bestTree = trees[val_err.index(min(val_err))]
+
 	# Aggregate the classifiers with soft voting.
-	eclf = VotingClassifier(estimators = [('GradBoost', boost1), ('ExtraRDT', rand), ('BaggedDT', bag)], voting = 'hard')
+	eclf = VotingClassifier(estimators = [('DecisionTree', bestTree), ('GradBoost', boost1), ('ExtraRDT', rand), ('BaggedDT', bag)], voting = 'hard')
 	eclf.fit(training, labels)
 	predict(eclf, test)
 
