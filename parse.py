@@ -1,10 +1,10 @@
 '''Kaggle Project First Try: Parsing the input'''
 
 import math
-import numpy
+import numpy as np
 import matplotlib.pyplot as plt
 from sklearn.ensemble import RandomForestClassifier, GradientBoostingClassifier, AdaBoostClassifier, VotingClassifier, ExtraTreesClassifier
-from sklearn import tree, cross_validation
+from sklearn import tree, cross_validation, svm
 # Holds the words corresponding to each coordinate in the bag of words
 # representation.
 names = []
@@ -102,24 +102,31 @@ if __name__ == '__main__':
 	bag = RandomForestClassifier(n_estimators = nbagged)
 	bag = bag.fit(training, labels)
 
-	# Trains some decision tree classifiers
+	# Trains some decision tree classifiers and picks the best one
 	train_err = []
 	val_err = []
 	trees = []
-	for i in range(1,200):
+	for i in np.arange(1, 200, 5):
+
 	# Specify tree params
 		dTree = tree.DecisionTreeClassifier(criterion = 'gini', min_samples_leaf = i)
 		# Train Tree
 		dTree = dTree.fit(xTrain, yTrain)
 		# Calculate Error
 		train_err.append(1 - dTree.score(xTrain, yTrain))
-		val_err.append(1 - dTree.score(xValidate, yValidate))
+		val_err.append(1 - cross_validation.cross_val_score(dTree, training, labels, cv = 5).mean())
+		#val_err.append(1 - dTree.score(xValidate, yValidate))
 		trees.append(dTree)
 
 	bestTree = trees[val_err.index(min(val_err))]
 
+	#SVM
+	supp_lin = svm.LinearSVC(penalty='l1', dual=False)
+	supp_lin.fit(training, labels)
 	# Aggregate the classifiers with soft voting.
-	eclf = VotingClassifier(estimators = [('DecisionTree', bestTree), ('GradBoost', boost1), ('ExtraRDT', rand), ('BaggedDT', bag)], voting = 'hard')
+	eclf = VotingClassifier(estimators = [('SVM', supp_lin), ('DecisionTree', bestTree), ('GradBoost', boost1), ('ExtraRDT', rand), ('BaggedDT', bag)], voting = 'hard')
+
+	print "The validation error is %f" % (1 - cross_validation.cross_val_score(eclf, training, labels, cv=5))
 	eclf.fit(training, labels)
 	predict(eclf, test)
 
