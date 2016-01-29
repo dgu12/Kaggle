@@ -1,10 +1,10 @@
 '''Kaggle Project First Try: Parsing the input'''
 
 import math
-import numpy
+import numpy as np
 import matplotlib.pyplot as plt
 from sklearn.ensemble import RandomForestClassifier, GradientBoostingClassifier, AdaBoostClassifier, VotingClassifier, ExtraTreesClassifier
-
+from sklearn import tree, cross_validation, svm
 # Holds the words corresponding to each coordinate in the bag of words
 # representation.
 names = []
@@ -82,6 +82,7 @@ if __name__ == '__main__':
 	   since it just prints the prediction to standard output otherwise.'''
 	(training, labels) = parseTraining('training_data.txt', '|')
 	test = parseTest('testing_data.txt', '|')
+	xTrain, xValidate, yTrain, yValidate = cross_validation.train_test_split(training, labels, test_size=0.1)
 	# Boosted Decision Trees
 	# We train a number of trees of max depth 3 (the default argument). Use
 	# 'exponential' to tell the class to use the AdaBoost algoritum.
@@ -101,8 +102,42 @@ if __name__ == '__main__':
 	bag = RandomForestClassifier(n_estimators = nbagged)
 	bag = bag.fit(training, labels)
 
+	# Trains some decision tree classifiers and picks the best one
+	train_err = []
+	val_err = []
+	ind = 0
+	max_score = 0
+	for i in np.arange(1, 200, 5):
+	# Specify tree params
+		dTree = tree.DecisionTreeClassifier(criterion = 'gini', min_samples_leaf = i)
+		# Calculate Error
+		mean = cross_validation.cross_val_score(dTree, training, labels, cv = 5).mean()
+        if mean > max_score:
+	    	max_score = mean
+	    	ind = i
+	    	print("Tree Accuracy: %0.2f (+/- %0.2f)" % (scores.mean(), scores.std() * 2))
+
+	bestTree = tree.DecisionTreeClassifier(criterion = 'gini', min_samples_leaf = ind)
+	bestTree.fit(training, labels)
+
+	#SVM
+	ind = 0
+	max_score = 0
+	for i in np.arange(0.3, 2, 0.1):
+	    supp_lin = svm.LinearSVC(C=i, penalty='l1', dual=False)
+	    scores = cross_validation.cross_val_score(supp_lin, training, labels, cv=5)
+	    mean = scores.mean()
+	    if mean > max_score:
+	    	max_score = mean
+	    	ind = i
+	    	print("SVM Accuracy: %0.2f (+/- %0.2f)" % (scores.mean(), scores.std() * 2))
+	supp_lin = svm.LinearSVC(C=ind, penalty='l1', dual=False)
+	supp_lin.fit(training, labels)
+	
 	# Aggregate the classifiers with soft voting.
-	eclf = VotingClassifier(estimators = [('GradBoost', boost1), ('ExtraRDT', rand), ('BaggedDT', bag)], voting = 'hard')
+	eclf = VotingClassifier(estimators = [('SVM', supp_lin), ('DecisionTree', bestTree), ('GradBoost', boost1), ('ExtraRDT', rand), ('BaggedDT', bag)], voting = 'hard')
+
+	print "The validation error is %f" % (1 - cross_validation.cross_val_score(eclf, training, labels, cv=5))
 	eclf.fit(training, labels)
 	predict(eclf, test)
 
