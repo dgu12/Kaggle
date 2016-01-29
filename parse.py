@@ -105,24 +105,35 @@ if __name__ == '__main__':
 	# Trains some decision tree classifiers and picks the best one
 	train_err = []
 	val_err = []
-	trees = []
+	ind = 0
+	max_score = 0
 	for i in np.arange(1, 200, 5):
-
 	# Specify tree params
 		dTree = tree.DecisionTreeClassifier(criterion = 'gini', min_samples_leaf = i)
-		# Train Tree
-		dTree = dTree.fit(xTrain, yTrain)
 		# Calculate Error
-		train_err.append(1 - dTree.score(xTrain, yTrain))
-		val_err.append(1 - cross_validation.cross_val_score(dTree, training, labels, cv = 5).mean())
-		#val_err.append(1 - dTree.score(xValidate, yValidate))
-		trees.append(dTree)
+		mean = cross_validation.cross_val_score(dTree, training, labels, cv = 5).mean()
+        if mean > max_score:
+	    	max_score = mean
+	    	ind = i
+	    	print("Tree Accuracy: %0.2f (+/- %0.2f)" % (scores.mean(), scores.std() * 2))
 
-	bestTree = trees[val_err.index(min(val_err))]
+	bestTree = tree.DecisionTreeClassifier(criterion = 'gini', min_samples_leaf = ind)
+	bestTree.fit(training, labels)
 
 	#SVM
-	supp_lin = svm.LinearSVC(penalty='l1', dual=False)
+	ind = 0
+	max_score = 0
+	for i in np.arange(0.3, 2, 0.1):
+	    supp_lin = svm.LinearSVC(C=i, penalty='l1', dual=False)
+	    scores = cross_validation.cross_val_score(supp_lin, training, labels, cv=5)
+	    mean = scores.mean()
+	    if mean > max_score:
+	    	max_score = mean
+	    	ind = i
+	    	print("SVM Accuracy: %0.2f (+/- %0.2f)" % (scores.mean(), scores.std() * 2))
+	supp_lin = svm.LinearSVC(C=ind, penalty='l1', dual=False)
 	supp_lin.fit(training, labels)
+	
 	# Aggregate the classifiers with soft voting.
 	eclf = VotingClassifier(estimators = [('SVM', supp_lin), ('DecisionTree', bestTree), ('GradBoost', boost1), ('ExtraRDT', rand), ('BaggedDT', bag)], voting = 'hard')
 
