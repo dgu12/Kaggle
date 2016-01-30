@@ -4,7 +4,7 @@ import math
 import numpy as np
 import matplotlib.pyplot as plt
 from sklearn.ensemble import RandomForestClassifier, GradientBoostingClassifier, AdaBoostClassifier, VotingClassifier, ExtraTreesClassifier
-from sklearn import tree, cross_validation, svm
+from sklearn import tree, cross_validation, svm, neighbors
 # Holds the words corresponding to each coordinate in the bag of words
 # representation.
 names = []
@@ -111,11 +111,12 @@ if __name__ == '__main__':
 	# Specify tree params
 		dTree = tree.DecisionTreeClassifier(criterion = 'gini', min_samples_leaf = i)
 		# Calculate Error
-		mean = cross_validation.cross_val_score(dTree, training, labels, cv = 5).mean()
+		scores = cross_validation.cross_val_score(dTree, training, labels, cv = 5)
+		mean = scores.mean()
         if mean > max_score:
 	    	max_score = mean
 	    	ind = i
-	    	print("Tree Accuracy: %0.2f (+/- %0.2f)" % (scores.mean(), scores.std() * 2))
+	    	print("Tree Accuracy: %0.2f (+/- %0.2f)" % (mean, scores.std() * 2))
 
 	bestTree = tree.DecisionTreeClassifier(criterion = 'gini', min_samples_leaf = ind)
 	bestTree.fit(training, labels)
@@ -133,11 +134,46 @@ if __name__ == '__main__':
 	    	print("SVM Accuracy: %0.2f (+/- %0.2f)" % (scores.mean(), scores.std() * 2))
 	supp_lin = svm.LinearSVC(C=ind, penalty='l1', dual=False)
 	supp_lin.fit(training, labels)
-	
-	# Aggregate the classifiers with soft voting.
-	eclf = VotingClassifier(estimators = [('SVM', supp_lin), ('DecisionTree', bestTree), ('GradBoost', boost1), ('ExtraRDT', rand), ('BaggedDT', bag)], voting = 'hard')
 
-	print "The validation error is %f" % (1 - cross_validation.cross_val_score(eclf, training, labels, cv=5))
+	# more Decision trees: Mod max depth param
+	train_err = []
+	val_err = []
+	ind = 0
+	max_score = 0
+	for i in np.arange(2, 202, 5):
+	# Specify tree params
+		dTree = tree.DecisionTreeClassifier(criterion = 'gini', max_depth = i)
+		# Calculate Error
+		scores = cross_validation.cross_val_score(dTree, training, labels, cv = 5)
+		mean = scores.mean()
+        if mean > max_score:
+	    	max_score = mean
+	    	ind = i
+	    	print("TreeD Accuracy: %0.2f (+/- %0.2f)" % (mean, scores.std() * 2))
+
+	bestTreeD = tree.DecisionTreeClassifier(criterion = 'gini', max_depth = ind)
+	bestTreeD.fit(training, labels)
+
+	ind = 0
+	max_score = 0
+	# Nearest Neighbors
+	for i in range(2, 20):
+		neigh = neighbors.KNeighborsClassifier(n_neighbors=i)
+		scores = cross_validation.cross_val_score(neigh, training, labels, cv=5)
+		mean = scores.mean()
+		if mean > max_score:
+			max_score = mean
+			ind = i
+			print("NearestNeighbors Accuracy: %0.2f (+/- %0.2f)" % (mean, scores.std() * 2))
+
+	bestNeigh = neighbors.KNeighborsClassifier(n_neighbors=ind)
+	bestNeigh.fit(training, labels)
+
+	# Aggregate the classifiers with soft voting.
+	eclf = VotingClassifier(estimators = [('NearestNeighbors', bestNeigh), ('DecisionTreeD', bestTreeD), ('SVM', supp_lin), ('DecisionTree', bestTree), ('GradBoost', boost1), ('ExtraRDT', rand), ('BaggedDT', bag)], voting = 'hard')
+	end_scores = cross_validation.cross_val_score(eclf, training, labels, cv=5)
+	print "The validation error is %f" % (1 - end_scores.mean())
+	print "The std is %f" % end_scores.std()
 	eclf.fit(training, labels)
 	predict(eclf, test)
 
