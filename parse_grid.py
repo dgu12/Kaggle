@@ -180,7 +180,7 @@ if __name__ == '__main__':
 
     clf = pipeline.Pipeline([('cluster', clusterer), ('voter', clf)])
 
-    params = {'cluster__n_clusters': [850,870,890,910,930], 'voter__Bayes__alpha': [0.9,1,1.1], 'voter__LinearSVM__C': [0.1,0.15,0.2,0.25,0.3], 'voter__DTree__min_samples_leaf': [2,3,4,5]}
+    params = {'cluster__n_clusters': [890], 'voter__Bayes__alpha': [1.05], 'voter__LinearSVM__C': [0.35,0.36,0.37,0.38,0.4], 'voter__DTree__min_samples_leaf': [1.5, 2, 2.5]}
 
     grid = grid_search.GridSearchCV(estimator=clf, iid=False, param_grid=params, n_jobs=-1, cv=3)
 
